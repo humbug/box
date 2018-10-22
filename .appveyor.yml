@@ -1,0 +1,44 @@
+build: false
+platform:
+  - x64
+clone_folder: c:\projects\box
+version: '{build}.{branch}'
+
+environment:
+  matrix:
+  - PHP_VERSION: 7.1
+  - PHP_VERSION: 7.2
+
+cache:
+    - '%LOCALAPPDATA%\Composer\files'
+    - composer.phar
+    - C:\ProgramData\chocolatey\bin -> .appveyor.yml
+    - C:\ProgramData\chocolatey\lib -> .appveyor.yml
+    - c:\tools\php -> .appveyor.yml
+
+init:
+    - SET PATH=C:\Program Files\OpenSSL;c:\tools\php\%PHP_VERSION%;%PATH%
+    - SET COMPOSER_NO_INTERACTION=1
+    - REG ADD "HKEY_CURRENT_USER\Software\Microsoft\Command Processor" /v DelayedExpansion /t REG_DWORD /d 1 /f
+
+install:
+    - IF NOT EXIST c:\php mkdir c:\php
+    - IF NOT EXIST c:\php\%PHP_VERSION% mkdir c:\php\%PHP_VERSION%
+    - ps: appveyor-retry cinst --params '""/InstallDir:C:\tools\php\%PHP_VERSION%""' --ignore-checksums -y php --version ((choco search php --exact --all-versions -r | select-string -pattern $env:PHP_VERSION | sort { [version]($_ -split '\|' | select -last 1) } -Descending | Select-Object -first 1) -replace '[php|]','')
+    - cd c:\tools\php\%PHP_VERSION%
+    - copy php.ini-production php.ini /Y
+    - echo date.timezone="UTC" >> php.ini
+    - echo extension_dir=ext >> php.ini
+    - echo extension=php_openssl.dll >> php.ini
+    - echo extension=php_mbstring.dll >> php.ini
+    - echo extension=php_fileinfo.dll >> php.ini
+    - echo extension=php_bz2.dll >> php.ini
+    - cd c:\projects\box
+    - IF NOT EXIST composer.phar (appveyor-retry appveyor DownloadFile https://github.com/composer/composer/releases/download/1.7.1/composer.phar)
+    - php composer.phar self-update
+    - IF %APPVEYOR_REPO_BRANCH%==master (SET COMPOSER_ROOT_VERSION=dev-master) ELSE (SET COMPOSER_ROOT_VERSION=%APPVEYOR_REPO_BRANCH%.x-dev)
+    - appveyor-retry php composer.phar install --no-interaction --no-progress --no-suggest --prefer-dist
+
+test_script:
+    - cd c:\projects\box
+    - bin\phpunit

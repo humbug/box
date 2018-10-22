@@ -1141,7 +1141,7 @@ JSON
     {
         $this->setConfig([
             'blacklist' => [
-                '/nowhere',
+                ($this->isWindows() ? 'C:' : '') . '/nowhere',
             ],
         ]);
 
